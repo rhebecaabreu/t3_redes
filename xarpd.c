@@ -11,6 +11,8 @@
 #include <net/ethernet.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <signal.h>
+
 /* */
 /* */
 #define MAX_PACKET_SIZE 65536
@@ -113,6 +115,19 @@ void print_usage()
 	printf("\xarpd <interface> [<interfaces>]\n");
 	exit(1);
 }
+
+/**
+* Trata sinais
+*/
+void treat_sign(int signal) 
+{ 
+    if (signal == SIGINT){
+		printf("\nRecebido SIGINT\n");
+		//printf("\n\nARP : %d   \nIP : %d  \nICMP : %d  \nUDP : %d   \nTCP : %d    \nTotal : %d  \n", arp, ip, icmp, udp, tcp, total);
+	}       
+    exit(0); 
+} 
+
 /* */
 // Break this function to implement the ARP functionalities.
 void doProcess(unsigned char* packet, int len) {
@@ -125,7 +140,7 @@ void doProcess(unsigned char* packet, int len) {
 	if(htons(0x0806) == eth->ether_type) {
 		arpheader = (struct arphdr *)(packet+14);
 	 	printf("\n");
-        printf("ARP/RARP Frame\n");
+        printf("ARP\n");
   		printf("   |-Hardware type: %d\n",ntohs(arpheader->htype)); 
   		printf("   |-Protocol type: 0x%04X\n", ntohs(arpheader->ptype));  
   		printf("   |-Length of hardware adress: %d\n", ((unsigned int)arpheader->hlen))*4; 
@@ -140,11 +155,13 @@ void doProcess(unsigned char* packet, int len) {
 		
 		printf("   |-Sender's protocol adress: %u.%u.%u.%u\n",arpheader->spa[0], arpheader->spa[1], arpheader->spa[2], arpheader->spa[3]);  
 	
-		printf("   |-Target hardware adress: "); 
-		for(int i=0; i<5;i++)
-        	printf("%02X:", arpheader->tha[i]);
-		printf("%02X:", arpheader->tha[5]);   
-		printf("\n");
+		printf("   |-Target hardware adress: %02X:%02X:%02X:%02X:%02X:%02X", arpheader->tha[0],arpheader->tha[1], arpheader->tha[2], arpheader->tha[3], arpheader->tha[4], arpheader->tha[5]); 
+
+		// printf("   |-Target hardware adress: "); 
+		// for(int i=0; i<5;i++)
+        // 	printf("%02X:", arpheader->tha[i]);
+		// printf("%02X", arpheader->tha[5]);   
+		printf("\n"); 
 
 		printf("   |-Target protocol adress: %u.%u.%u.%u\n", arpheader->tpa[0], arpheader->tpa[1], arpheader->tpa[2], arpheader->tpa[3]);   
 
@@ -174,7 +191,11 @@ void read_iface(struct iface *ifn)
 			exit(1);
 		}
 		doProcess(packet_buffer, n);
+		
+		signal(SIGINT, treat_sign); 
 	}
+	free(packet_buffer);
+
 }
 /* */
 // main function
@@ -203,7 +224,10 @@ int main(int argc, char** argv) {
 	for (i = 0; i < argc-1; i++) {
 		print_eth_address(my_ifaces[i].ifname, my_ifaces[i].mac_addr);
 		printf("\n");
+		
 		// Create one thread for each interface. Each thread should run the function read_iface.
+
+		read_iface(&my_ifaces[i]); //MARK: - Testing 
 	}
 	return 0;
 }
