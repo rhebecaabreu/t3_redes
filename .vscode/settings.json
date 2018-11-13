@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.tcc": "c",
+        "deque": "c",
+        "vector": "c",
+        "inet.h": "c"
+    }
+}
