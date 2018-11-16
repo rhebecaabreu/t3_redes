@@ -17,7 +17,7 @@
 /* */
 /* */
 #define MAX_PACKET_SIZE 65536
-#define MIN_PACKET_SIZE 40
+#define MIN_PACKET_SIZE 20
 /* */
 #define MAX_IFACES 64
 #define MAX_IFNAME_LEN 22
@@ -120,7 +120,7 @@ void get_iface_info(int sockfd, char *ifname, struct iface *ifn)
 // Print the expected command line for the program
 void print_usage()
 {
-	printf("\xarpd <interface> [<interfaces>]\n");
+	printf("/xarpd <interface> [<interfaces>]\n");
 	exit(1);
 }
 
