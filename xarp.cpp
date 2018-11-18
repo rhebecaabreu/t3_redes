@@ -25,7 +25,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-
 using namespace std;
 
 #define xstr(s) str(s)
@@ -37,8 +36,8 @@ using namespace std;
 
 /* Format for fscanf() to read the 1st, 4th, and 6th space-delimited fields */
 #define ARP_LINE_FORMAT "%" xstr(ARP_STRING_LEN) "s %*s %*s "                      \
-						"%" xstr(ARP_STRING_LEN) "s %*s " \
-						"%" xstr(ARP_STRING_LEN) "s"
+												 "%" xstr(ARP_STRING_LEN) "s %*s " \
+																		  "%" xstr(ARP_STRING_LEN) "s"
 
 struct arp_table
 {
@@ -54,6 +53,37 @@ FILE *arpCache;
 struct arp_table arptables;
 struct arp_table *arptable;
 
+int sockfd;
+int portno = 5050;
+char *retvalue;
+char buffer[256];
+
+void connectDaemon()
+{
+	
+	struct sockaddr_in serv_addr;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (sockfd < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+	memset((char *)&serv_addr, 0, sizeof(serv_addr));
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	serv_addr.sin_port = htons(portno);
+
+	//man connect
+	if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+}
+
 // Print the expected command line for the program
 void print_usage()
 {
@@ -66,45 +96,59 @@ void print_usage()
 	exit(1);
 }
 
-void readArpTable() { 
-
-}
-
-void showEthernetAdress(char *argv){
+void showEthernetAdress(char *argv)
+{
 	printf("pao\n");
+	//TODO
 }
 
 void showArpTable()
 {
-	arpCache = fopen(ARP_CACHE, "r");
-
-	if (!arpCache)
-	{
-		perror("Arp Cache: Failed to open file \"" ARP_CACHE "\"");
+	strcpy(buffer, "show");
+	
+	//man send
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
 	}
 
-	arptable = &arptables;
+	printf("Mensagem recebida: \"%s\"\n", buffer);
 
-	/* Ignore the first line, which contains the header */
-	char header[ARP_BUFFER_LEN];
-	if (!fgets(header, sizeof(header), arpCache))
-	{
-		exit(1);
-	}
+	// arpCache = fopen(ARP_CACHE, "r");
 
-	int count = 0;
+	// if (!arpCache)
+	// {
+	// 	perror("Arp Cache: Failed to open file \"" ARP_CACHE "\"");
+	// 	exit(1);
+	// }
 
-	while (3 == fscanf(arpCache, ARP_LINE_FORMAT, arptable->ipAddr, arptable->hwAddr, arptable->device))
-	{
-		arptable->id[count] = count;
-		printf("%d    %s    %s\n", arptable->id[count], arptable->ipAddr, arptable->hwAddr);
-		count++;
-	}
+	// arptable = &arptables;
 
-	fclose(arpCache);
+	// /* Ignore the first line, which contains the header */
+	// char header[ARP_BUFFER_LEN];
+	// if (!fgets(header, sizeof(header), arpCache))
+	// {
+	// 	exit(1);
+	// }
+
+	// int count = 0;
+
+	// while (3 == fscanf(arpCache, ARP_LINE_FORMAT, arptable->ipAddr, arptable->hwAddr, arptable->device))
+	// {
+	// 	arptable->id[count] = count;
+	// 	printf("%d    %s    %s\n", arptable->id[count], arptable->ipAddr, arptable->hwAddr);
+	// 	count++;
+	// }
+
+	// fclose(arpCache);
 }
-
 
 /* */
 // main function
@@ -112,12 +156,12 @@ int main(int argc, char **argv)
 {
 	int i, sockfd;
 
-	if (argc < 2) {
+	if (argc < 2)
+	{
 		print_usage();
-
 	}
 
-	readArpTable();
+	connectDaemon();
 
 	if (strcmp(argv[1], "show") == 0)
 	{
@@ -125,25 +169,31 @@ int main(int argc, char **argv)
 	}
 
 	if (strcmp(argv[1], "res") == 0)
-	{ 
-		if(argc == 2){
+	{
+		if (argc == 2)
+		{
 			print_usage();
-		} 		
+		}
 		showEthernetAdress(argv[3]);
 	}
 
 	if (strcmp(argv[1], "del") == 0)
 	{
-		if(argc == 2){
+		if (argc == 2)
+		{
 			print_usage();
-		} 
+		}
 		//TODO
 	}
 
-	if(strcmp(argv[1], "add") == 0){
-		if(argc == 5){
+	if (strcmp(argv[1], "add") == 0)
+	{
+		if (argc == 5)
+		{
 			//TODO
-		} else {
+		}
+		else
+		{
 			print_usage();
 		}
 	}
