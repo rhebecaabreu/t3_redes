@@ -27,40 +27,12 @@
 
 using namespace std;
 
-#define xstr(s) str(s)
-#define str(s) #s
-
-#define ARP_CACHE "/proc/net/arp"
-#define ARP_STRING_LEN 1023
-#define ARP_BUFFER_LEN (ARP_STRING_LEN + 1)
-
-/* Format for fscanf() to read the 1st, 4th, and 6th space-delimited fields */
-#define ARP_LINE_FORMAT "%" xstr(ARP_STRING_LEN) "s %*s %*s "                      \
-												 "%" xstr(ARP_STRING_LEN) "s %*s " \
-																		  "%" xstr(ARP_STRING_LEN) "s"
-
-struct arp_table
-{
-	int id[ARP_BUFFER_LEN];
-	char ipAddr[ARP_BUFFER_LEN];
-	char hwAddr[ARP_BUFFER_LEN];
-	char device[ARP_BUFFER_LEN];
-	int time;
-};
-
-FILE *arpCache;
-
-struct arp_table arptables;
-struct arp_table *arptable;
-
 int sockfd;
 int portno = 5050;
-char *retvalue;
 char buffer[256];
 
 void connectDaemon()
 {
-	
 	struct sockaddr_in serv_addr;
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -98,8 +70,33 @@ void print_usage()
 
 void showEthernetAdress(char *argv)
 {
-	printf("pao\n");
-	//TODO
+	
+ 	char *variavel1, *variavel2;
+    variavel2 = argv;
+    variavel1 = "res ";
+    int tamanho = strlen(variavel1) + strlen(variavel2) + 1;
+    
+    char *s = new char[tamanho];
+
+    strcat(buffer, variavel1);
+    strcat(buffer, variavel2);
+    
+	cout << buffer << endl; 
+
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	//TODO ----------------------------------------
+	printf("Mensagem recebida: \"%s\"\n", buffer);
 }
 
 void showArpTable()
@@ -119,35 +116,8 @@ void showArpTable()
 		exit(1);
 	}
 
+	//TODO ----------------------------------------
 	printf("Mensagem recebida: \"%s\"\n", buffer);
-
-	// arpCache = fopen(ARP_CACHE, "r");
-
-	// if (!arpCache)
-	// {
-	// 	perror("Arp Cache: Failed to open file \"" ARP_CACHE "\"");
-	// 	exit(1);
-	// }
-
-	// arptable = &arptables;
-
-	// /* Ignore the first line, which contains the header */
-	// char header[ARP_BUFFER_LEN];
-	// if (!fgets(header, sizeof(header), arpCache))
-	// {
-	// 	exit(1);
-	// }
-
-	// int count = 0;
-
-	// while (3 == fscanf(arpCache, ARP_LINE_FORMAT, arptable->ipAddr, arptable->hwAddr, arptable->device))
-	// {
-	// 	arptable->id[count] = count;
-	// 	printf("%d    %s    %s\n", arptable->id[count], arptable->ipAddr, arptable->hwAddr);
-	// 	count++;
-	// }
-
-	// fclose(arpCache);
 }
 
 /* */
@@ -174,7 +144,7 @@ int main(int argc, char **argv)
 		{
 			print_usage();
 		}
-		showEthernetAdress(argv[3]);
+		showEthernetAdress(argv[2]);
 	}
 
 	if (strcmp(argv[1], "del") == 0)
@@ -198,4 +168,3 @@ int main(int argc, char **argv)
 		}
 	}
 }
-/* */

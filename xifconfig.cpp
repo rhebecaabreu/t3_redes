@@ -17,7 +17,8 @@
 // Print the expected command line for the program
 void print_usage()
 {
-	printf("\xifconfig <interface> [<interfaces>]\n");
+	printf("/xifconfig <interface> <IP adress> <IP Netmask>\n");
+	printf("/xifconfig <interface> mtu size");
 	exit(1);
 }
 
@@ -27,8 +28,13 @@ int main(int argc, char **argv)
 {
 	int i, sockfd;
 
-	if (argc < 2)
+	if (argc < 2) {
+		//TODO 
+		printf("eth0\n");
+	}
+	if(argc > 3) {
 		print_usage();
+	}
 
 }
 /* */
