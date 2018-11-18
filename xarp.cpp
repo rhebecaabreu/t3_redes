@@ -73,7 +73,36 @@ void showEthernetAdress(char *argv)
 	
  	char *variavel1, *variavel2;
     variavel2 = argv;
-    variavel1 = "res ";
+    variavel1 = "res:";
+    int tamanho = strlen(variavel1) + strlen(variavel2) + 1;
+    
+    char *s = new char[tamanho];
+
+    strcat(buffer, variavel1);
+    strcat(buffer, variavel2);
+    
+	cout << buffer << endl; 
+
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	//TODO ----------------------------------------
+	printf("Mensagem recebida: \"%s\"\n", buffer);
+}
+
+void delIp(char *argv){
+	char *variavel1, *variavel2;
+    variavel2 = argv;
+    variavel1 = "del:";
     int tamanho = strlen(variavel1) + strlen(variavel2) + 1;
     
     char *s = new char[tamanho];
@@ -153,7 +182,7 @@ int main(int argc, char **argv)
 		{
 			print_usage();
 		}
-		//TODO
+		delIp(argv[2]);
 	}
 
 	if (strcmp(argv[1], "add") == 0)
