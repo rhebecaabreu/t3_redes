@@ -27,12 +27,40 @@
 
 using namespace std;
 
+#define xstr(s) str(s)
+#define str(s) #s
+
+#define ARP_CACHE "/proc/net/arp"
+#define ARP_STRING_LEN 1023
+#define ARP_BUFFER_LEN (ARP_STRING_LEN + 1)
+
+/* Format for fscanf() to read the 1st, 4th, and 6th space-delimited fields */
+#define ARP_LINE_FORMAT "%" xstr(ARP_STRING_LEN) "s %*s %*s "                      \
+												 "%" xstr(ARP_STRING_LEN) "s %*s " \
+																		  "%" xstr(ARP_STRING_LEN) "s"
+
+struct arp_table
+{
+	int id[ARP_BUFFER_LEN];
+	char ipAddr[ARP_BUFFER_LEN];
+	char hwAddr[ARP_BUFFER_LEN];
+	char device[ARP_BUFFER_LEN];
+	int time;
+};
+
+FILE *arpCache;
+
+struct arp_table arptables;
+struct arp_table *arptable;
+
 int sockfd;
 int portno = 5050;
+char *retvalue;
 char buffer[256];
 
 void connectDaemon()
 {
+	
 	struct sockaddr_in serv_addr;
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -68,21 +96,12 @@ void print_usage()
 	exit(1);
 }
 
-void showEthernetAdress(char *argv)
+void showEthernetAdress(string ip)
 {
+	string op = "res:" + ip;
+	strcpy(buffer, op.c_str());
 	
- 	char *variavel1, *variavel2;
-    variavel2 = argv;
-    variavel1 = "res:";
-    int tamanho = strlen(variavel1) + strlen(variavel2) + 1;
-    
-    char *s = new char[tamanho];
-
-    strcat(buffer, variavel1);
-    strcat(buffer, variavel2);
-    
-	cout << buffer << endl; 
-
+	//man send
 	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
 		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
@@ -90,42 +109,15 @@ void showEthernetAdress(char *argv)
   
 	memset(buffer, 0, sizeof(buffer));
 	//man recv
-	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		cout << "res" << endl;
+		memset(buffer, 0, sizeof(buffer));
 	}
 
-	//TODO ----------------------------------------
-	printf("Mensagem recebida: \"%s\"\n", buffer);
-}
-
-void delIp(char *argv){
-	char *variavel1, *variavel2;
-    variavel2 = argv;
-    variavel1 = "del:";
-    int tamanho = strlen(variavel1) + strlen(variavel2) + 1;
-    
-    char *s = new char[tamanho];
-
-    strcat(buffer, variavel1);
-    strcat(buffer, variavel2);
-    
-	cout << buffer << endl; 
-
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-  
-	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-
-	//TODO ----------------------------------------
-	printf("Mensagem recebida: \"%s\"\n", buffer);
+	cout << rec;
+	close(sockfd);
 }
 
 void showArpTable()
@@ -137,16 +129,115 @@ void showArpTable()
 		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
 	}
+
   
 	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	if(recv(sockfd, buffer, sizeof(buffer), 0) < 0) {
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		cout << "show" << endl;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+    cout << "Entrada\t\t\tEndereço IP\t\tEndereço Ethernet\t\tTTL" << endl;
+	cout << rec;
+	close(sockfd);
+
+	// arpCache = fopen(ARP_CACHE, "r");
+
+	// if (!arpCache)
+	// {
+	// 	perror("Arp Cache: Failed to open file \"" ARP_CACHE "\"");
+	// 	exit(1);
+	// }
+
+	// arptable = &arptables;
+
+	// /* Ignore the first line, which contains the header */
+	// char header[ARP_BUFFER_LEN];
+	// if (!fgets(header, sizeof(header), arpCache))
+	// {
+	// 	exit(1);
+	// }
+
+	// int count = 0;
+
+	// while (3 == fscanf(arpCache, ARP_LINE_FORMAT, arptable->ipAddr, arptable->hwAddr, arptable->device))
+	// {
+	// 	arptable->id[count] = count;
+	// 	printf("%d    %s    %s\n", arptable->id[count], arptable->ipAddr, arptable->hwAddr);
+	// 	count++;
+	// }
+
+	// fclose(arpCache);
+}
+
+void del(string ip){
+	string op = "del:" + ip;
+	strcpy(buffer, op.c_str());
+	
+	//man send
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
 		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
 	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		cout << "del" << endl;
+		memset(buffer, 0, sizeof(buffer));
+	}
 
-	//TODO ----------------------------------------
-	printf("Mensagem recebida: \"%s\"\n", buffer);
+	cout << rec;
+	close(sockfd);
+}
+
+void add(string ip, string eth, string ttl){
+	string op = "add:" + ip + "|" + eth + "|" + ttl;
+	strcpy(buffer, op.c_str());
+	
+	//man send
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		cout << "del" << endl;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
+
+void ttl(int val){
+	string op = "ttl:" + to_string(val);
+	strcpy(buffer, op.c_str());
+	
+	//man send
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+  
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
 }
 
 /* */
@@ -161,6 +252,10 @@ int main(int argc, char **argv)
 	}
 
 	connectDaemon();
+
+	if (argc == 2 && strcmp(argv[1], "show") != 0){
+		ttl(atoi(argv[1]));
+	}
 
 	if (strcmp(argv[1], "show") == 0)
 	{
@@ -182,18 +277,20 @@ int main(int argc, char **argv)
 		{
 			print_usage();
 		}
-		delIp(argv[2]);
+		del(argv[2]);
 	}
 
 	if (strcmp(argv[1], "add") == 0)
 	{
 		if (argc == 5)
 		{
-			//TODO
+			add(argv[2], argv[3], argv[4]);
 		}
 		else
 		{
 			print_usage();
 		}
 	}
+	
 }
+/* */
