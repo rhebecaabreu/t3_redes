@@ -142,34 +142,6 @@ void showArpTable()
     cout << "Entrada\t\t\tEndereço IP\t\tEndereço Ethernet\t\tTTL" << endl;
 	cout << rec;
 	close(sockfd);
-
-	// arpCache = fopen(ARP_CACHE, "r");
-
-	// if (!arpCache)
-	// {
-	// 	perror("Arp Cache: Failed to open file \"" ARP_CACHE "\"");
-	// 	exit(1);
-	// }
-
-	// arptable = &arptables;
-
-	// /* Ignore the first line, which contains the header */
-	// char header[ARP_BUFFER_LEN];
-	// if (!fgets(header, sizeof(header), arpCache))
-	// {
-	// 	exit(1);
-	// }
-
-	// int count = 0;
-
-	// while (3 == fscanf(arpCache, ARP_LINE_FORMAT, arptable->ipAddr, arptable->hwAddr, arptable->device))
-	// {
-	// 	arptable->id[count] = count;
-	// 	printf("%d    %s    %s\n", arptable->id[count], arptable->ipAddr, arptable->hwAddr);
-	// 	count++;
-	// }
-
-	// fclose(arpCache);
 }
 
 void del(string ip){
