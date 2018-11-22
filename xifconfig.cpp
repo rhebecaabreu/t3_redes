@@ -71,6 +71,7 @@ void xifconfig()
 	string rec;
 	while((read(sockfd, buffer, sizeof(buffer))) != 0){
 		rec += buffer;
+		// cout << "show" << endl;
 		memset(buffer, 0, sizeof(buffer));
 	}
 
