@@ -8,7 +8,30 @@
 #include <unistd.h>
 #include <sstream>
 #include <thread>
+
+#include <sys/ioctl.h>
+
 #include "TabelaArp.h"
+
+#define MAX_IFACES 64
+#define MAX_IFNAME_LEN 22
+
+struct iface
+{
+    int sockfd;
+    int ttl;
+    int mtu;
+    char ifname[MAX_IFNAME_LEN];
+    unsigned char mac_addr[6];
+    unsigned char ip_addr[14];
+    unsigned char bcast_addr[14];
+    unsigned char masc_addr[14];
+    unsigned int rx_pkts;
+    unsigned int rx_bytes;
+    unsigned int tx_pkts;
+    unsigned int tx_bytes;
+};
+
 
 vector<string> split_to_vector(string str, char delimiter){
     //Separa palavras de 'str' de acordo com 'delimiter' e retorna um vector com as palavras sem o delimiter
@@ -89,7 +112,7 @@ long TabelaArp::qntd_entradas() {
     return this->tabela.size();
 }
 
-string TabelaArp::res(string ip){
+string TabelaArp::res(string ip) {
     //TODO enviar requisicao arp caso o ip não esteja na tabela e aguardar um timeout de resposta
     lock_guard<mutex> lck(mtx_tabela);
     auto it = tabela.find(ip);
@@ -100,7 +123,53 @@ string TabelaArp::res(string ip){
     else return result = "Endereço IP desconhecido!\n";
 }
 
-void TabelaArp::trata_requisicao() {
+void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
+
+//     eth0
+//              Link encap:Ethernet Endereço de HW 00:1e:4f:43:48:06
+//              inet end.: 200.129.207.50 Bcast:200.129.207.63 Masc:255.255.255.224
+//              UP MTU:1500
+//              RX packets:64763539 TX packets:146111148
+//              RX bytes:9474581484 (8.8 GiB) TX bytes:202753664071 (188.8 GiB)
+
+    string interface;
+    string inetEnd;
+    string mac;
+    string mac2;
+    string mtu;
+
+     string rxPackets;
+     string rxBytes;
+
+    for(int i = 0; i < 1; i++){
+
+        char buf[100]{};
+        snprintf(buf, sizeof(buf),"%02X:%02X:%02X:%02X:%02X:%02X \n", ifn[i].mac_addr[0], ifn[i].mac_addr[1], ifn[i].mac_addr[2], ifn[i].mac_addr[3], ifn[i].mac_addr[4], ifn[i].mac_addr[5]);
+        mac2 = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].ip_addr);
+        string ip_src = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].bcast_addr);
+        string bcast_src = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].masc_addr);
+        string masc_src = buf;
+
+        interface = strcat(ifn[i].ifname, "\n");
+        mac = "         Link encap: Ethernet Endereço de HW: ";
+        mtu = "         UP MTU: "+ to_string(ifn[i].mtu)+"\n";
+        inetEnd = "         inet end.: "+ip_src+" Bcast: "+bcast_src+" Masc: "+masc_src+"\n";
+        rxPackets = "         RX packets: ";
+        rxBytes = "         RX bytes: ";
+
+        write(client_sock, interface.c_str(), interface.size());
+        write(client_sock, mac.c_str(), mac.size());
+        write(client_sock, mac2.c_str(), mac2.size());
+        write(client_sock, inetEnd.c_str(), inetEnd.size());
+        write(client_sock, mtu.c_str(), mtu.size());
+
+    }
+}
+
+void TabelaArp::trata_requisicao(struct iface *ifn) {
     struct sockaddr_in serverIPAddress{};
     serverIPAddress.sin_family = AF_INET;
     serverIPAddress.sin_addr.s_addr = INADDR_ANY;
@@ -133,7 +202,7 @@ void TabelaArp::trata_requisicao() {
         cout << "Aguardando conexão..." << endl;
         int client_sock = accept(sockfd, (struct sockaddr *) &client_ip_addr, (socklen_t*) &addr_len);
         cout << "Cliente " << j++ << " conectado!" << endl;
-        thread t(&TabelaArp::pao, this, client_sock);
+        thread t(&TabelaArp::pao, this, client_sock, ifn);
         t.join();
         if (client_sock < 0){
             perror("Erro em accept()");
@@ -142,7 +211,8 @@ void TabelaArp::trata_requisicao() {
     }
 }
 
-void TabelaArp::pao(int client_sock) {
+void TabelaArp::pao(int client_sock, struct iface *ifn) {
+
     char buffer[4096]{};
     string request;
     read(client_sock, buffer, sizeof(buffer));
@@ -187,6 +257,9 @@ void TabelaArp::pao(int client_sock) {
         ip = request.substr(pos+1);
         string result = res(ip);
         write(client_sock, result.c_str(), result.size());
+    }
+    else if (request.find("xifconfig") != -1){
+        xifconfig_exibe(client_sock, ifn);
     }
 
     close(client_sock);

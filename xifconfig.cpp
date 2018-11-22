@@ -1,9 +1,9 @@
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -12,7 +12,21 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <signal.h>
-#include <pthread.h>
+#include <utility>
+#include <iostream>
+#include <condition_variable>
+#include <fcntl.h>
+#include <fstream>
+#include <sstream>
+#include <stdio.h>
+#include <csignal>
+#include <wait.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+
+using namespace std;
 
 int sockfd;
 int portno = 5050;
@@ -41,6 +55,27 @@ void connectDaemon()
 		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
 	}
+}
+
+void xifconfig()
+{
+	strcpy(buffer, "xifconfig");
+	
+	//man send
+	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	string rec;
+	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
 }
 
 // Print the expected command line for the program
@@ -72,8 +107,7 @@ int main(int argc, char **argv)
 	connectDaemon(); 
 
 	if (argc < 2) {
-		//TODO 
-		printf("eth0\n");
+		xifconfig();
 	}
 	if(argc > 3) {
 		print_usage();

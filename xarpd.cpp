@@ -16,6 +16,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <ifaddrs.h>
 #include "TabelaArp.h"
 
 /* */
@@ -34,7 +35,6 @@
 using namespace std;
 
 
-
 TabelaArp tabelaArp;
 
 struct iface
@@ -44,8 +44,10 @@ struct iface
 	int mtu;
 	char ifname[MAX_IFNAME_LEN];
 	unsigned char mac_addr[6];
-	unsigned int ip_addr;
-	unsigned int rx_pkts;
+	unsigned char ip_addr[14];
+    unsigned char bcast_addr[14];
+    unsigned char masc_addr[14];
+    unsigned int rx_pkts;
 	unsigned int rx_bytes;
 	unsigned int tx_pkts;
 	unsigned int tx_bytes;
@@ -99,7 +101,7 @@ struct iface my_ifaces[MAX_IFACES];
 // Print an Ethernet address
 void print_eth_address(char *s, unsigned char *eth_addr)
 {
-	printf("%s %02X:%02X:%02X:%02X:%02X:%02X", s,
+	printf("%s %02X:%02X:%02X:%02X:%02X:%02X \n", s,
 		   eth_addr[0], eth_addr[1], eth_addr[2],
 		   eth_addr[3], eth_addr[4], eth_addr[5]);
 }
@@ -115,7 +117,43 @@ void get_iface_info(int sockfd, char *ifname, struct iface *ifn)
 	struct ifreq s;
 
 	strcpy(s.ifr_name, ifname);
-	if (0 == ioctl(sockfd, SIOCGIFHWADDR, &s))
+
+	//MTU value
+	if (0 == ioctl(sockfd, SIOCGIFMTU, &s)) {
+		ifn->mtu = s.ifr_ifru.ifru_mtu;
+	}
+
+	//INET value
+	s.ifr_addr.sa_family = AF_INET;
+	if (0==ioctl(sockfd, SIOCGIFADDR, &s)) {
+		char buf[14]{};
+		snprintf(buf, sizeof(buf),"%s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_addr)->sin_addr));
+		string a = buf;
+		strcpy( (char*) ifn->ip_addr, a.c_str() );
+//		cout << ifn->ip_addr << endl;
+	}
+
+    //broadcast value
+    s.ifr_addr.sa_family = AF_INET;
+    if (0==ioctl(sockfd, SIOCGIFBRDADDR, &s)) {
+        char buf[14]{};
+        snprintf(buf, sizeof(buf),"%s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_broadaddr)->sin_addr));
+        string a = buf;
+        strcpy( (char*) ifn->bcast_addr, a.c_str() );
+//		cout << ifn->bcast_addr << endl;
+    }
+
+    //mask value
+    s.ifr_addr.sa_family = AF_INET;
+    if (0==ioctl(sockfd, SIOCGIFNETMASK, &s)) {
+        char buf[14]{};
+        snprintf(buf, sizeof(buf),"%s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_netmask)->sin_addr));
+        string a = buf;
+        strcpy( (char*) ifn->masc_addr, a.c_str() );
+//        cout << ifn->masc_addr << endl;
+    }
+
+    if (0 == ioctl(sockfd, SIOCGIFHWADDR, &s))
 	{
 		memcpy(ifn->mac_addr, s.ifr_addr.sa_data, ETH_ADDR_LEN);
 		ifn->sockfd = sockfd;
@@ -142,7 +180,6 @@ void treat_sign(int signal)
 	if (signal == SIGINT)
 	{
 		printf("\nRecebido SIGINT\n");
-		//printf("\n\nARP : %d   \nIP : %d  \nICMP : %d  \nUDP : %d   \nTCP : %d    \nTotal : %d  \n", arp, ip, icmp, udp, tcp, total);
 	}
 	exit(0);
 }
@@ -199,6 +236,7 @@ void read_iface(struct iface *ifn)
     cout << this_thread::get_id() << " rodando..." << endl;
 	socklen_t saddr_len;
 	struct sockaddr saddr{};
+
 	unsigned char *packet_buffer;
 	int n;
 
@@ -267,7 +305,7 @@ int main(int argc, char **argv)
 		printf("Thread principal a esperar a terminação das threads criadas \n");
 	}
 
-	thread requisicao(&TabelaArp::trata_requisicao, &tabelaArp);
+	thread requisicao(&TabelaArp::trata_requisicao, &tabelaArp, my_ifaces);
 
 	for (i = 0; i < argc-1; i++) {
 	    pool_threads[i]->join(); /* Esperar a junção das threads */
