@@ -130,7 +130,6 @@ void get_iface_info(int sockfd, char *ifname, struct iface *ifn)
 		snprintf(buf, sizeof(buf),"%s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_addr)->sin_addr));
 		string a = buf;
 		strcpy( (char*) ifn->ip_addr, a.c_str() );
-//		cout << ifn->ip_addr << endl;
 	}
 
     //broadcast value

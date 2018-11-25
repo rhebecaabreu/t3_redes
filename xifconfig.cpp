@@ -105,6 +105,7 @@ void config_mtu_size(string interface, string mtu)
 	cout << rec;
 	close(sockfd);
 }
+
 void xifconfig()
 {
 	strcpy(buffer, "xifconfig");
@@ -121,7 +122,6 @@ void xifconfig()
 	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
 	{
 		rec += buffer;
-		// cout << "show" << endl;
 		memset(buffer, 0, sizeof(buffer));
 	}
 
@@ -133,7 +133,7 @@ void xifconfig()
 void print_usage()
 {
 	printf("/xifconfig <interface> <IP adress> <IP Netmask>\n");
-	printf("/xifconfig <interface> mtu size");
+	printf("/xifconfig <interface> mtu size\n");
 	exit(1);
 }
 
@@ -143,7 +143,6 @@ void print_usage()
 // => usando socket => https://stackoverflow.com/questions/39832427/unable-to-change-ip-address-using-ioctl-siocsifaddr
 // => rolé do mtu tb=> https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
 // => meio meh ======> https://www.linuxquestions.org/questions/programming-9/problem-to-set-gateway-using-c-program-846692/
-// RUIM  => https://www.includehelp.com/cpp-programs/set-ip-address-subnet-mask-network-gateway-in-linux-system.aspx
 
 // ========== xifconfig
 // https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig

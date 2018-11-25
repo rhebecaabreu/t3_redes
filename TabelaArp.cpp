@@ -11,6 +11,7 @@
 
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 
 #include "TabelaArp.h"
 
@@ -161,8 +162,8 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
         mac = "         Link encap: Ethernet Endereço de HW: ";
         mtu = "         UP MTU: "+ to_string(ifn[i].mtu)+"\n";
         inetEnd = "         inet end.: "+ip_src+" Bcast: "+bcast_src+" Masc: "+masc_src+"\n";
-        rxPackets = "         RX packets: ";    
-        rxBytes = "         RX bytes: ";
+        rxPackets = "         RX packets: ";    //TODO rx packtes tx packets
+        rxBytes = "         RX bytes: ";        //TODO rx bytes tx bytes
 
         write(client_sock, interface.c_str(), interface.size());
         write(client_sock, mac.c_str(), mac.size());
@@ -173,18 +174,40 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
         write(client_sock, rxPackets.c_str(), rxPackets.size());
         write(client_sock, rxBytes.c_str(), rxBytes.size());
 
-
     }
 }
 
-void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
+void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, string ip_mask) {
 
+    char buf[100]{};
+    struct ifreq ifr;
+    strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ);
+
+    ifr.ifr_addr.sa_family = AF_INET;
+    inet_pton(AF_INET, ip.c_str(), ifr.ifr_addr.sa_data + 2);
+    ioctl(client_sock, SIOCSIFADDR, &ifr);
+    snprintf(buf, sizeof(buf),"%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+    string ip_src = buf;
+    string msg ="IP address is now " + ip_src + "\n";
+
+    memset(buf, 0 , sizeof(buf));
+
+    inet_pton(AF_INET, ip_mask.c_str(), ifr.ifr_addr.sa_data + 2);
+    ioctl(client_sock, SIOCSIFNETMASK, &ifr);
+    snprintf(buf, sizeof(buf),"%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_netmask)->sin_addr));
+    string netmask = buf;
+    string msg2 ="IP netmask is now " + netmask + "\n";
+
+    write(client_sock, msg.c_str(), msg.size());
+    write(client_sock, msg2.c_str(), msg2.size());
+}
+
+void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
 
     struct ifreq ifr;
     strcpy(ifr.ifr_name, interface.c_str());
     if(!ioctl(client_socket, SIOCGIFMTU, &ifr)) {
         ifr.ifr_mtu; // Contains current mtu value
-        cout << "hmm" <<  ifr.ifr_mtu << endl;
     }
     ifr.ifr_mtu = mtu; // Change value if it needed
     if(!ioctl(client_socket, SIOCSIFMTU, &ifr)) {
@@ -195,8 +218,8 @@ void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
 
     write(client_socket, msg.c_str(), msg.size());
 
-
 }
+
 
 void TabelaArp::trata_requisicao(struct iface *ifn) {
     struct sockaddr_in serverIPAddress{};
@@ -301,10 +324,10 @@ void TabelaArp::pao(int client_sock, struct iface *ifn) {
         }
         else{
 //            add(dados[0], dados[1], atoi(dados[2].c_str()));
+            conf_ip_mask(client_sock, dados[0], dados[1], dados[2]);
 
             //TODO -----------------------------------------------
-            msg = "---------------------\n";
-            write(client_sock, msg.c_str(), msg.size());
+
         }
 
     } 
