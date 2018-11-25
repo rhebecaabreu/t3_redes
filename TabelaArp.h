@@ -9,8 +9,36 @@
 #include <map>
 #include <vector>
 #include <mutex>
+#include <thread>
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+#include <linux/if_arp.h>
+#include <linux/if_ether.h>
+#include <asm/ioctls.h>
+#include "Iface.h"
+#include <condition_variable>
+#include <atomic>
+
+#define ETH2_HEADER_LEN 14
+#define HW_TYPE 1
+#define MAC_LENGTH 6
+#define IPV4_LENGTH 4
+#define ARP_REQUEST 0x01
 
 using namespace std;
+
+struct arp_header
+{
+    unsigned short hardware_type;
+    unsigned short protocol_type;
+    unsigned char hardware_len;
+    unsigned char  protocol_len;
+    unsigned short opcode;
+    unsigned char sender_mac[MAC_LENGTH];
+    unsigned char sender_ip[IPV4_LENGTH];
+    unsigned char target_mac[MAC_LENGTH];
+    unsigned char target_ip[IPV4_LENGTH];
+};
 
 class TabelaArp {
 private:
@@ -30,25 +58,35 @@ private:
 
 
 public:
-    TabelaArp() {}
+
+    TabelaArp() = default;;
+    void aguarda_conexao(int sockfd);
     void trata_requisicao(struct iface *ifn);
-    void pao(int client_sock, struct iface *ifn);
+    void trata_conexao(int client_sock, struct iface *ifn);
     void add(string ip, string eth);
     void add(string ip, string eth, int ttl);
     void decrementa_ttl();
-    long qntd_entradas();
+    bool req_arp(unsigned char* ip_src, unsigned char* ip_dst, string iface_name, Iface iface);
     void show(int client_sock);
     void del(string ip, int client_sock);
     void altera_ttl(int ttl);
     string res(string ip);
+    void clear();
 
     void xifconfig_exibe(int client_sock, struct iface *ifn); //nome de metodo cagado
     void change_mtu(string interface, int client_soc, int mtu);
     void conf_ip_mask(int client_sock, string interface, string ip, string ip_mask);
 
 
-    mutex mtx_tabela;
+
+    condition_variable semaforo;
+    bool aguardando_reply = false;
+    string ip_a_resolver;
+    int raw_sock;
+    mutex mtx_tabela, mtx_req;
+
     int ttl_default = 60;
+    vector<Iface> ifaces;
 
 };
 

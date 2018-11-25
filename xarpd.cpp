@@ -18,6 +18,7 @@
 #include <vector>
 #include <ifaddrs.h>
 #include "TabelaArp.h"
+#include "Iface.h"
 
 /* */
 /* */
@@ -52,6 +53,7 @@ struct iface
 	unsigned int tx_pkts;
 	unsigned int tx_bytes;
 };
+
 /* */
 struct ether_hdr
 {
@@ -82,7 +84,7 @@ struct ip_hdr
 };
 
 /* */
-typedef struct arphdr
+typedef struct arpheader
 {
 	u_int16_t htype;	  /* Hardware Type           */
 	u_int16_t ptype;	  /* Protocol Type           */
@@ -96,15 +98,18 @@ typedef struct arphdr
 } arphdr_t;
 //
 //
-struct iface my_ifaces[MAX_IFACES];
+Iface my_ifaces[MAX_IFACES];
+mutex mtx_print;
 //
 // Print an Ethernet address
 void print_eth_address(char *s, unsigned char *eth_addr)
 {
-	printf("%s %02X:%02X:%02X:%02X:%02X:%02X \n", s,
+
+	printf("Interface: %s\nMAC: %02X:%02X:%02X:%02X:%02X:%02X\n", s,
 		   eth_addr[0], eth_addr[1], eth_addr[2],
 		   eth_addr[3], eth_addr[4], eth_addr[5]);
 }
+
 /* */
 // Bind a socket to an interface
 int bind_iface_name(int fd, char *iface_name)
@@ -112,10 +117,10 @@ int bind_iface_name(int fd, char *iface_name)
 	return setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface_name, strlen(iface_name));
 }
 /* */
-void get_iface_info(int sockfd, char *ifname, struct iface *ifn)
+void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 {
-	struct ifreq s;
-
+	//PEGAR ENDEREÇO MAC
+	struct ifreq s{};
 	strcpy(s.ifr_name, ifname);
 
 	//MTU value
@@ -163,6 +168,23 @@ void get_iface_info(int sockfd, char *ifname, struct iface *ifn)
 		perror("Error getting MAC address");
 		exit(1);
 	}
+
+	//PEGAR ENDEREÇO IPV4
+	struct ifreq s2{};
+	strcpy(s2.ifr_name, ifname);
+	int sockudp;
+	if ((sockudp = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
+		perror("Erro ao criar socket udp()");
+	}
+
+	if ((ioctl(sockudp, SIOCGIFADDR, &s2)) < 0){
+		perror("Erro ao bindar interface ao socket udp");
+		exit(1);
+	}
+	close(sockudp);
+
+	auto* ipaddr = (struct sockaddr_in*)&s2.ifr_addr;
+	ifn->ip_addr = inet_ntoa(ipaddr->sin_addr);
 }
 // Print the expected command line for the program
 void print_usage()
@@ -176,9 +198,8 @@ void print_usage()
 */
 void treat_sign(int signal)
 {
-	if (signal == SIGINT)
-	{
-		printf("\nRecebido SIGINT\n");
+	if (signal == SIGINT) {
+	    cout << "Recebido SIGINT, encerrando aplicação..." << endl;
 	}
 	exit(0);
 }
@@ -195,7 +216,7 @@ void doProcess(unsigned char *packet, int len)
 
 	if (htons(0x0806) == eth->ether_type)
 	{
-		arpheader = (struct arphdr *)(packet + 14);
+		arpheader = (struct arpheader *)(packet + 14);
 //		printf("\n");
 //		printf("ARP\n");
 //		printf("   |-Hardware type: %d\n", ntohs(arpheader->htype));
@@ -223,6 +244,15 @@ void doProcess(unsigned char *packet, int len)
         snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", arpheader->sha[0], arpheader->sha[1], arpheader->sha[2], arpheader->sha[3], arpheader->sha[4], arpheader->sha[5]);
         string eth_src = buf;
 
+		/** Verifica se está esperando um arq reply e se estiver avisa a thread bloqueada **/
+		if (ntohs(arpheader->oper) != ARP_REQUEST && tabelaArp.aguardando_reply){
+			lock_guard<mutex> lck(tabelaArp.mtx_req);
+			if (tabelaArp.ip_a_resolver == ip_src){
+				tabelaArp.aguardando_reply = false;
+				tabelaArp.semaforo.notify_one();
+			}
+		}
+
         tabelaArp.add(ip_src, eth_src);
         tabelaArp.add(ip_dest, eth_dest);
     }
@@ -230,9 +260,7 @@ void doProcess(unsigned char *packet, int len)
 }
 /* */
 // This function should be one thread for each interface.
-void read_iface(struct iface *ifn)
-{
-    cout << this_thread::get_id() << " rodando..." << endl;
+void read_iface(Iface *ifn){
 	socklen_t saddr_len;
 	struct sockaddr saddr{};
 
@@ -287,31 +315,31 @@ int main(int argc, char **argv)
 			close(sockfd);
 			exit(1);
 		}
+
+		tabelaArp.raw_sock = sockfd;
 		get_iface_info(sockfd, argv[i], &my_ifaces[i - 1]);
 	}
 
-	for (i = 0; i < argc - 1; i++) { 
+	/** IMPRIME DADOS DE CADA INTERFACE **/
+	cout << "ARP Deamon rodando...\nInterfaces identificadas:\n\n";
+	for (i = 0; i < argc - 1; i++) {
+	    lock_guard<mutex> lck(mtx_print);
 		print_eth_address(my_ifaces[i].ifname, my_ifaces[i].mac_addr);
+		cout << "IPv4: " << my_ifaces[i].ip_addr  << "\n" << endl;
+		tabelaArp.ifaces.emplace_back(my_ifaces[i]);
 	}
 
 	vector<thread*> pool_threads;
 
-	thread ttl_thread(verifica_tabela);
-
 	for (i = 0; i < argc - 1; i++) {
         pool_threads.emplace_back(new thread(read_iface, &my_ifaces[i]));
-		//pthread_create(&threads[i], NULL, read_iface(&my_ifaces[i]), NULL);
-		printf("Thread principal a esperar a terminação das threads criadas \n");
 	}
+	pool_threads.emplace_back(new thread(verifica_tabela));
+	pool_threads.emplace_back(new thread(&TabelaArp::trata_requisicao, &tabelaArp));
 
-	thread requisicao(&TabelaArp::trata_requisicao, &tabelaArp, my_ifaces);
-
-	for (i = 0; i < argc-1; i++) {
+	for (i = 0; i < pool_threads.size(); i++) {
 	    pool_threads[i]->join(); /* Esperar a junção das threads */
     }
-
-    requisicao.join();
-	ttl_thread.join();
 
 	
 	return 0;

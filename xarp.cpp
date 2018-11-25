@@ -24,6 +24,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <thread>
 
 using namespace std;
 
@@ -39,230 +40,154 @@ using namespace std;
 												 "%" xstr(ARP_STRING_LEN) "s %*s " \
 																		  "%" xstr(ARP_STRING_LEN) "s"
 
-struct arp_table
+class arp_table
 {
-	int id[ARP_BUFFER_LEN];
-	char ipAddr[ARP_BUFFER_LEN];
-	char hwAddr[ARP_BUFFER_LEN];
-	char device[ARP_BUFFER_LEN];
-	int time;
+    int id;
+    string ipAddr, hwAddr;
+    int time;
 };
-
-FILE *arpCache;
 
 struct arp_table arptables;
 struct arp_table *arptable;
 
 int sockfd;
 int portno = 5050;
-char *retvalue;
-char buffer[256];
 
 void connectDaemon()
 {
-	
-	struct sockaddr_in serv_addr;
 
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serv_addr{};
 
-	if (sockfd < 0)
-	{
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-	memset((char *)&serv_addr, 0, sizeof(serv_addr));
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	serv_addr.sin_port = htons(portno);
+    if (sockfd < 0){
+        fprintf(stderr, "ERROR: %s\n", strerror(errno));
+        exit(1);
+    }
 
-	//man connect
-	if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-	{
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    serv_addr.sin_port = htons(portno);
+
+    //man connect
+    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        fprintf(stderr, "ERROR: %s\n", strerror(errno));
+        exit(1);
+    }
 }
 
 // Print the expected command line for the program
-void print_usage()
-{
-	printf("/xarp show - shows ARP table\n");
-	printf("/xarp res <IP adress>\n");
-	printf("/xarp add <IP adress> <ethernet adress> <ttl>\n");
-	printf("/xarp del <IP adress>\n");
-	printf("/xarp <ttl>\n");
+void print_usage() {
+    printf("./xarp show - shows ARP table\n");
+    printf("./xarp res <IP adress>\n");
+    printf("./xarp add <IP adress> <ethernet adress> <ttl>\n");
+    printf("./xarp del <IP adress>\n");
+    printf("./xarp <ttl>\n");
+    printf("./xarp <clear>\n");
 
-	exit(1);
+    exit(1);
 }
 
-void showEthernetAdress(string ip)
-{
-	string op = "res:" + ip;
-	strcpy(buffer, op.c_str());
-	
-	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-  
-	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
-		rec += buffer;
-		cout << "res" << endl;
-		memset(buffer, 0, sizeof(buffer));
-	}
+string send_tcp(const string &op){
+    char buffer[4096]{};
 
-	cout << rec;
-	close(sockfd);
+    if(write(sockfd, op.c_str(), op.size()) < 0) {
+        perror("Erro ao escrever no socket");
+        exit(1);
+    }
+
+    string rec;
+    while((read(sockfd, buffer, sizeof(buffer))) != 0){
+        rec += buffer;
+        memset(buffer, 0, sizeof(buffer));
+    }
+
+    close(sockfd);
+    return rec;
 }
 
-void showArpTable()
-{
-	strcpy(buffer, "show");
-	
-	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
+void showEthernetAdress(const string &ip){
+    string op = "res:" + ip;
+    cout << "Aguardando resposta..." << endl;
+    cout << send_tcp(op) << endl;
+}
 
-  
-	memset(buffer, 0, sizeof(buffer));
-	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
-		rec += buffer;
-		cout << "show" << endl;
-		memset(buffer, 0, sizeof(buffer));
-	}
-
+void showArpTable() {
     cout << "Entrada\t\t\tEndereço IP\t\tEndereço Ethernet\t\tTTL" << endl;
-	cout << rec;
-	close(sockfd);
+    cout << send_tcp("show");
 }
 
-void del(string ip){
-	string op = "del:" + ip;
-	strcpy(buffer, op.c_str());
-	
-	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-  
-	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
-		rec += buffer;
-		cout << "del" << endl;
-		memset(buffer, 0, sizeof(buffer));
-	}
-
-	cout << rec;
-	close(sockfd);
+void del(const string &ip) {
+    cout << send_tcp("del:" + ip) << endl;
 }
 
-void add(string ip, string eth, string ttl){
-	string op = "add:" + ip + "|" + eth + "|" + ttl;
-	strcpy(buffer, op.c_str());
-	
-	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-  
-	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
-		rec += buffer;
-		cout << "del" << endl;
-		memset(buffer, 0, sizeof(buffer));
-	}
-
-	cout << rec;
-	close(sockfd);
+void add(const string &ip, const string &eth, const string &ttl){
+    string op = "add:" + ip + "|" + eth + "|" + ttl;
+    cout << send_tcp(op) << endl;
 }
 
 void ttl(int val){
-	string op = "ttl:" + to_string(val);
-	strcpy(buffer, op.c_str());
-	
-	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
-		fprintf(stderr, "ERROR: %s\n", strerror(errno));
-		exit(1);
-	}
-  
-	memset(buffer, 0, sizeof(buffer));
-	//man recv
-	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
-		rec += buffer;
-		memset(buffer, 0, sizeof(buffer));
-	}
-
-	cout << rec;
-	close(sockfd);
+    cout << send_tcp("ttl:" + to_string(val)) << endl;
 }
 
-/* */
-// main function
+void clear(){
+    cout << send_tcp("clear") << endl;
+}
+
 int main(int argc, char **argv)
 {
-	int i, sockfd;
+    int i, sockfd;
 
-	if (argc < 2)
-	{
-		print_usage();
-	}
+    if (argc < 2)
+    {
+        print_usage();
+    }
 
-	connectDaemon();
+    connectDaemon();
 
-	if (argc == 2 && strcmp(argv[1], "show") != 0){
-		ttl(atoi(argv[1]));
-	}
+    if (argc == 2 && strcmp(argv[1], "show") != 0 && strcmp(argv[1], "clear") != 0){
+        ttl(atoi(argv[1]));
+    }
 
-	if (strcmp(argv[1], "show") == 0)
-	{
-		showArpTable();
-	}
+    if (strcmp(argv[1], "show") == 0)
+    {
+        showArpTable();
+    }
 
-	if (strcmp(argv[1], "res") == 0)
-	{
-		if (argc == 2)
-		{
-			print_usage();
-		}
-		showEthernetAdress(argv[2]);
-	}
+    if (strcmp(argv[1], "res") == 0)
+    {
+        if (argc == 2)
+        {
+            print_usage();
+        }
+        showEthernetAdress(argv[2]);
+    }
 
-	if (strcmp(argv[1], "del") == 0)
-	{
-		if (argc == 2)
-		{
-			print_usage();
-		}
-		del(argv[2]);
-	}
+    if (strcmp(argv[1], "del") == 0)
+    {
+        if (argc == 2)
+        {
+            print_usage();
+        }
+        del(argv[2]);
+    }
 
-	if (strcmp(argv[1], "add") == 0)
-	{
-		if (argc == 5)
-		{
-			add(argv[2], argv[3], argv[4]);
-		}
-		else
-		{
-			print_usage();
-		}
-	}
-	
+    if (strcmp(argv[1], "add") == 0)
+    {
+        if (argc == 5)
+        {
+            add(argv[2], argv[3], argv[4]);
+        }
+        else
+        {
+            print_usage();
+        }
+    }
+
+    if (argc == 2 && strcmp(argv[1], "clear") == 0)
+    {
+        clear();
+    }
+
 }
 /* */
