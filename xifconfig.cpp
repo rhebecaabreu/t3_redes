@@ -1,9 +1,9 @@
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -12,7 +12,20 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <signal.h>
-#include <pthread.h>
+#include <utility>
+#include <iostream>
+#include <condition_variable>
+#include <fcntl.h>
+#include <fstream>
+#include <sstream>
+#include <stdio.h>
+#include <csignal>
+#include <wait.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+using namespace std;
 
 int sockfd;
 int portno = 5050;
@@ -43,25 +56,97 @@ void connectDaemon()
 	}
 }
 
+void config_interface_ip_mask(string interface, string ip, string ip_netmask)
+{
+	string op = "conf_ip_mask:" + interface + "|" + ip + "|" + ip_netmask;
+	strcpy(buffer, op.c_str());
+
+	//man send
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
+
+void config_mtu_size(string interface, string mtu)
+{
+	string op = "mtu:" + interface + "|" + mtu;
+	strcpy(buffer, op.c_str());
+
+	//man send
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
+
+void xifconfig()
+{
+	strcpy(buffer, "xifconfig");
+
+	//man send
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	string rec;
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
+
 // Print the expected command line for the program
 void print_usage()
 {
 	printf("/xifconfig <interface> <IP adress> <IP Netmask>\n");
-	printf("/xifconfig <interface> mtu size");
+	printf("/xifconfig <interface> mtu size\n");
 	exit(1);
 }
 
 // ========== xifconfig <interface> <IP address> <IP Netmask>
 // => usando socket => https://www.pacificsimplicity.ca/blog/set-ip-address-and-routing-c
-// => usando socket => https://stackoverflow.com/questions/6652384/how-to-set-the-ip-address-from-c-in-linux 
+// => usando socket => https://stackoverflow.com/questions/6652384/how-to-set-the-ip-address-from-c-in-linux
 // => usando socket => https://stackoverflow.com/questions/39832427/unable-to-change-ip-address-using-ioctl-siocsifaddr
 // => rolé do mtu tb=> https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
 // => meio meh ======> https://www.linuxquestions.org/questions/programming-9/problem-to-set-gateway-using-c-program-846692/
-// RUIM  => https://www.includehelp.com/cpp-programs/set-ip-address-subnet-mask-network-gateway-in-linux-system.aspx
 
-// ========== xifconfig 
+// ========== xifconfig
 // https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
-// 
+//
 
 /* */
 // main function
@@ -69,15 +154,31 @@ int main(int argc, char **argv)
 {
 	int i, sockfd;
 
-	connectDaemon(); 
+	connectDaemon();
 
-	if (argc < 2) {
-		//TODO 
-		printf("eth0\n");
+	if (argc < 2)
+	{
+		xifconfig();
 	}
-	if(argc > 3) {
+	if (argc > 4)
+	{
 		print_usage();
 	}
-
+	else
+	{
+		if (argc == 4)
+		{
+			config_interface_ip_mask(argv[1], argv[2], argv[3]);
+		}
+		else if (argc == 3)
+		{
+			cout << "pao" << endl;
+			config_mtu_size(argv[1], argv[2]);
+		}
+		else if (argc == 2)
+		{
+			config_mtu_size(argv[1], "1500");
+		}
+	}
 }
 /* */

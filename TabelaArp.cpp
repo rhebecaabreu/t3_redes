@@ -8,9 +8,34 @@
 #include <unistd.h>
 #include <sstream>
 #include <thread>
-#include <net/if.h>
+
 #include <sys/ioctl.h>
+#include <net/if.h>
+#include <arpa/inet.h>
 #include "TabelaArp.h"
+
+#define MAX_IFACES 64
+#define MAX_IFNAME_LEN 22
+
+using namespace std;
+
+
+struct iface
+{
+    int sockfd;
+    int ttl;
+    int mtu;
+    char ifname[MAX_IFNAME_LEN];
+    unsigned char mac_addr[6];
+    unsigned char ip_addr[14];
+    unsigned char bcast_addr[14];
+    unsigned char masc_addr[14];
+    unsigned int rx_pkts;
+    unsigned int rx_bytes;
+    unsigned int tx_pkts;
+    unsigned int tx_bytes;
+};
+
 
 vector<string> split_to_vector(string str, char delimiter){
     //Separa palavras de 'str' de acordo com 'delimiter' e retorna um vector com as palavras sem o delimiter
@@ -131,7 +156,100 @@ void TabelaArp::clear(){
     tabela.clear();
 }
 
-void TabelaArp::trata_requisicao() {
+void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
+
+//     eth0
+//              Link encap:Ethernet Endereço de HW 00:1e:4f:43:48:06
+//              inet end.: 200.129.207.50 Bcast:200.129.207.63 Masc:255.255.255.224
+//              UP MTU:1500
+//              RX packets:64763539 TX packets:146111148
+//              RX bytes:9474581484 (8.8 GiB) TX bytes:202753664071 (188.8 GiB)
+
+    string interface;
+    string inetEnd;
+    string mac;
+    string mac2;
+    string mtu;
+
+     string rxPackets;
+     string rxBytes;
+
+    for(int i = 0; i < 1; i++){     // TODO arrumar isso aqui, esta lendo apenas para uma interface, se passar mais de uma da bosta
+
+        char buf[100]{};
+        snprintf(buf, sizeof(buf),"%02X:%02X:%02X:%02X:%02X:%02X \n", ifn[i].mac_addr[0], ifn[i].mac_addr[1], ifn[i].mac_addr[2], ifn[i].mac_addr[3], ifn[i].mac_addr[4], ifn[i].mac_addr[5]);
+        mac2 = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].ip_addr);
+        string ip_src = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].bcast_addr);
+        string bcast_src = buf;
+        snprintf(buf, sizeof(buf), "%s", ifn[i].masc_addr);
+        string masc_src = buf;
+
+        interface = strcat(ifn[i].ifname, "\n");
+        mac = "         Link encap: Ethernet Endereço de HW: ";
+        mtu = "         UP MTU: "+ to_string(ifn[i].mtu)+"\n";
+        inetEnd = "         inet end.: "+ip_src+" Bcast: "+bcast_src+" Masc: "+masc_src+"\n";
+        rxPackets = "         RX packets: ";    //TODO rx packtes tx packets
+        rxBytes = "         RX bytes: ";        //TODO rx bytes tx bytes
+
+        write(client_sock, interface.c_str(), interface.size());
+        write(client_sock, mac.c_str(), mac.size());
+        write(client_sock, mac2.c_str(), mac2.size());
+        write(client_sock, inetEnd.c_str(), inetEnd.size());
+        write(client_sock, mtu.c_str(), mtu.size());
+
+        write(client_sock, rxPackets.c_str(), rxPackets.size());
+        write(client_sock, rxBytes.c_str(), rxBytes.size());
+
+    }
+}
+
+void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, string ip_mask) {
+
+    char buf[100]{};
+    struct ifreq ifr;
+    strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ);
+
+    ifr.ifr_addr.sa_family = AF_INET;
+    inet_pton(AF_INET, ip.c_str(), ifr.ifr_addr.sa_data + 2);
+    ioctl(client_sock, SIOCSIFADDR, &ifr);
+    snprintf(buf, sizeof(buf),"%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+    string ip_src = buf;
+    string msg ="IP address is now " + ip_src + "\n";
+
+    memset(buf, 0 , sizeof(buf));
+
+    inet_pton(AF_INET, ip_mask.c_str(), ifr.ifr_addr.sa_data + 2);
+    ioctl(client_sock, SIOCSIFNETMASK, &ifr);
+    snprintf(buf, sizeof(buf),"%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_netmask)->sin_addr));
+    string netmask = buf;
+    string msg2 ="IP netmask is now " + netmask + "\n";
+
+    write(client_sock, msg.c_str(), msg.size());
+    write(client_sock, msg2.c_str(), msg2.size());
+}
+
+void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
+
+    struct ifreq ifr;
+    strcpy(ifr.ifr_name, interface.c_str());
+    if(!ioctl(client_socket, SIOCGIFMTU, &ifr)) {
+        ifr.ifr_mtu; // Contains current mtu value
+    }
+    ifr.ifr_mtu = mtu; // Change value if it needed
+    if(!ioctl(client_socket, SIOCSIFMTU, &ifr)) {
+        ifr.ifr_mtu;
+    }
+
+    auto msg ="MTU now is "+ std::to_string(ifr.ifr_mtu) + "\n";
+
+    write(client_socket, msg.c_str(), msg.size());
+
+}
+
+
+void TabelaArp::trata_requisicao(struct iface *ifn) {
     struct sockaddr_in serverIPAddress{};
     serverIPAddress.sin_family = AF_INET;
     serverIPAddress.sin_addr.s_addr = INADDR_ANY;
@@ -167,8 +285,13 @@ void TabelaArp::aguarda_conexao(int sockfd) {
         int addr_len = sizeof(client_ip_addr);
         //cout << "Aguardando conexão..." << endl;
         int client_sock = accept(sockfd, (struct sockaddr *) &client_ip_addr, (socklen_t*) &addr_len);
+
+//         thread t(&TabelaArp::pao, this, client_sock, ifn);
+//         t.join();
+
         //cout << "Cliente " << j++ << " conectado!" << endl;
-        trata_conexao(client_sock);
+        trata_conexao(client_sock, ifn);
+
         if (client_sock < 0){
             perror("Erro em accept()");
             continue;
@@ -176,7 +299,7 @@ void TabelaArp::aguarda_conexao(int sockfd) {
     }
 }
 
-void TabelaArp::trata_conexao(int client_sock) {
+void TabelaArp::trata_conexao(int client_sock, struct iface *ifn) {
     char buffer[2048]{};
     string request;
 
@@ -228,6 +351,40 @@ void TabelaArp::trata_conexao(int client_sock) {
         string result = res(ip);
         write(client_sock, result.c_str(), result.size());
     }
+    else if (request.find("xifconfig") != -1) {
+        xifconfig_exibe(client_sock, ifn);
+    }
+    else if (request.find("conf_ip_mask") != -1) {
+        int pos = request.find(":");
+        string interface, ip, mask, msg;
+        request = request.substr(pos+1);
+        vector<string> dados = split_to_vector(request, '|');
+        if (dados.size() < 3){
+            msg = "Dados inválidos!\n";
+            write(client_sock, msg.c_str(), msg.size());
+        }
+        else{
+//            add(dados[0], dados[1], atoi(dados[2].c_str()));
+            conf_ip_mask(client_sock, dados[0], dados[1], dados[2]);
+
+            //TODO -----------------------------------------------
+
+        }
+
+    } 
+    else if(request.find("mtu") != -1) {
+        int pos = request.find(":");
+        string interface, ip, mask, msg;
+        request = request.substr(pos+1);
+        vector<string> dados = split_to_vector(request, '|');
+        if (dados.size() < 2){
+            msg = "Dados inválidos!\n";
+            write(client_sock, msg.c_str(), msg.size());
+        }
+        else{
+            change_mtu(dados[0], client_sock, stoi(dados[1]));
+        }
+    } 
     else if (request.find("clear") != 1){
         clear();
         string result = "Tabela limpa!";

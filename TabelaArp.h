@@ -58,10 +58,11 @@ private:
 
 
 public:
+
     TabelaArp() = default;;
     void aguarda_conexao(int sockfd);
-    void trata_requisicao();
-    void trata_conexao(int client_sock);
+    void trata_requisicao(struct iface *ifn);
+    void trata_conexao(int client_sock, struct iface *ifn);
     void add(string ip, string eth);
     void add(string ip, string eth, int ttl);
     void decrementa_ttl();
@@ -72,11 +73,18 @@ public:
     string res(string ip);
     void clear();
 
+    void xifconfig_exibe(int client_sock, struct iface *ifn); //nome de metodo cagado
+    void change_mtu(string interface, int client_soc, int mtu);
+    void conf_ip_mask(int client_sock, string interface, string ip, string ip_mask);
+
+
+
     condition_variable semaforo;
     bool aguardando_reply = false;
     string ip_a_resolver;
     int raw_sock;
     mutex mtx_tabela, mtx_req;
+
     int ttl_default = 60;
     vector<Iface> ifaces;
 
