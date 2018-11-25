@@ -37,22 +37,22 @@ using namespace std;
 
 
 TabelaArp tabelaArp;
-
-struct iface
-{
-	int sockfd;
-	int ttl;
-	int mtu;
-	char ifname[MAX_IFNAME_LEN];
-	unsigned char mac_addr[6];
-	unsigned char ip_addr[14];
-    unsigned char bcast_addr[14];
-    unsigned char masc_addr[14];
-    unsigned int rx_pkts;
-	unsigned int rx_bytes;
-	unsigned int tx_pkts;
-	unsigned int tx_bytes;
-};
+//
+//struct iface
+//{
+//	int sockfd;
+//	int ttl;
+//	int mtu;
+//	char ifname[MAX_IFNAME_LEN];
+//	unsigned char mac_addr[6];
+//	unsigned char ip_addr[14];
+//    unsigned char bcast_addr[14];
+//    unsigned char masc_addr[14];
+//    unsigned int rx_pkts;
+//	unsigned int rx_bytes;
+//	unsigned int tx_pkts;
+//	unsigned int tx_bytes;
+//};
 
 /* */
 struct ether_hdr
@@ -186,6 +186,8 @@ void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 
 	auto* ipaddr = (struct sockaddr_in*)&s2.ifr_addr;
 	ifn->ip_addr = inet_ntoa(ipaddr->sin_addr);
+	
+
 }
 
 

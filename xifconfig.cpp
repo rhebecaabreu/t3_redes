@@ -137,16 +137,6 @@ void print_usage()
 	exit(1);
 }
 
-// ========== xifconfig <interface> <IP address> <IP Netmask>
-// => usando socket => https://www.pacificsimplicity.ca/blog/set-ip-address-and-routing-c
-// => usando socket => https://stackoverflow.com/questions/6652384/how-to-set-the-ip-address-from-c-in-linux
-// => usando socket => https://stackoverflow.com/questions/39832427/unable-to-change-ip-address-using-ioctl-siocsifaddr
-// => rolé do mtu tb=> https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
-// => meio meh ======> https://www.linuxquestions.org/questions/programming-9/problem-to-set-gateway-using-c-program-846692/
-
-// ========== xifconfig
-// https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
-//
 
 /* */
 // main function
