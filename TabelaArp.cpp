@@ -174,8 +174,7 @@ void TabelaArp::xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces)
      string rxPackets;
      string rxBytes;
 
-    for(int i = 0; i < qtd_interfaces; i++){     // TODO arrumar isso aqui, esta lendo apenas para uma interface, se passar mais de uma da bosta
-
+    for(int i = 0; i < qtd_interfaces; i++) {
         char buf[100]{};
         snprintf(buf, sizeof(buf),"%02X:%02X:%02X:%02X:%02X:%02X \n", ifn[i].mac_addr[0], ifn[i].mac_addr[1], ifn[i].mac_addr[2], ifn[i].mac_addr[3], ifn[i].mac_addr[4], ifn[i].mac_addr[5]);
         mac2 = buf;

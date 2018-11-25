@@ -73,11 +73,9 @@ public:
     string res(string ip);
     void clear();
 
-    void xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces); //nome de metodo cagado
+    void xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces);
     void change_mtu(string interface, int client_soc, int mtu);
     void conf_ip_mask(int client_sock, string interface, string ip, string ip_mask);
-
-
 
     condition_variable semaforo;
     bool aguardando_reply = false;
