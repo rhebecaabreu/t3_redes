@@ -25,7 +25,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-
 using namespace std;
 
 int sockfd;
@@ -57,19 +56,70 @@ void connectDaemon()
 	}
 }
 
+void config_interface_ip_mask(string interface, string ip, string ip_netmask)
+{
+	string op = "conf_ip_mask:" + interface + "|" + ip + "|" + ip_netmask;
+	strcpy(buffer, op.c_str());
+
+	//man send
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
+
+void config_mtu_size(string interface, string mtu)
+{
+	string op = "mtu:" + interface + "|" + mtu;
+	strcpy(buffer, op.c_str());
+
+	//man send
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
+		fprintf(stderr, "ERROR: %s\n", strerror(errno));
+		exit(1);
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+	//man recv
+	string rec;
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
+		rec += buffer;
+		memset(buffer, 0, sizeof(buffer));
+	}
+
+	cout << rec;
+	close(sockfd);
+}
 void xifconfig()
 {
 	strcpy(buffer, "xifconfig");
-	
+
 	//man send
-	if(send(sockfd, buffer, strlen(buffer), 0) < 0) {
+	if (send(sockfd, buffer, strlen(buffer), 0) < 0)
+	{
 		fprintf(stderr, "ERROR: %s\n", strerror(errno));
 		exit(1);
 	}
 
 	memset(buffer, 0, sizeof(buffer));
 	string rec;
-	while((read(sockfd, buffer, sizeof(buffer))) != 0){
+	while ((read(sockfd, buffer, sizeof(buffer))) != 0)
+	{
 		rec += buffer;
 		// cout << "show" << endl;
 		memset(buffer, 0, sizeof(buffer));
@@ -89,15 +139,15 @@ void print_usage()
 
 // ========== xifconfig <interface> <IP address> <IP Netmask>
 // => usando socket => https://www.pacificsimplicity.ca/blog/set-ip-address-and-routing-c
-// => usando socket => https://stackoverflow.com/questions/6652384/how-to-set-the-ip-address-from-c-in-linux 
+// => usando socket => https://stackoverflow.com/questions/6652384/how-to-set-the-ip-address-from-c-in-linux
 // => usando socket => https://stackoverflow.com/questions/39832427/unable-to-change-ip-address-using-ioctl-siocsifaddr
 // => rolé do mtu tb=> https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
 // => meio meh ======> https://www.linuxquestions.org/questions/programming-9/problem-to-set-gateway-using-c-program-846692/
 // RUIM  => https://www.includehelp.com/cpp-programs/set-ip-address-subnet-mask-network-gateway-in-linux-system.aspx
 
-// ========== xifconfig 
+// ========== xifconfig
 // https://stackoverflow.com/questions/4951257/using-c-code-to-get-same-info-as-ifconfig
-// 
+//
 
 /* */
 // main function
@@ -105,14 +155,31 @@ int main(int argc, char **argv)
 {
 	int i, sockfd;
 
-	connectDaemon(); 
+	connectDaemon();
 
-	if (argc < 2) {
+	if (argc < 2)
+	{
 		xifconfig();
 	}
-	if(argc > 3) {
+	if (argc > 4)
+	{
 		print_usage();
 	}
-
+	else
+	{
+		if (argc == 4)
+		{
+			config_interface_ip_mask(argv[1], argv[2], argv[3]);
+		}
+		else if (argc == 3)
+		{
+			cout << "pao" << endl;
+			config_mtu_size(argv[1], argv[2]);
+		}
+		else if (argc == 2)
+		{
+			config_mtu_size(argv[1], "1500");
+		}
+	}
 }
 /* */

@@ -10,11 +10,15 @@
 #include <thread>
 
 #include <sys/ioctl.h>
+#include <net/if.h>
 
 #include "TabelaArp.h"
 
 #define MAX_IFACES 64
 #define MAX_IFNAME_LEN 22
+
+using namespace std;
+
 
 struct iface
 {
@@ -141,7 +145,7 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
      string rxPackets;
      string rxBytes;
 
-    for(int i = 0; i < 1; i++){
+    for(int i = 0; i < 1; i++){     // TODO arrumar isso aqui, esta lendo apenas para uma interface, se passar mais de uma da bosta
 
         char buf[100]{};
         snprintf(buf, sizeof(buf),"%02X:%02X:%02X:%02X:%02X:%02X \n", ifn[i].mac_addr[0], ifn[i].mac_addr[1], ifn[i].mac_addr[2], ifn[i].mac_addr[3], ifn[i].mac_addr[4], ifn[i].mac_addr[5]);
@@ -157,7 +161,7 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
         mac = "         Link encap: Ethernet Endereço de HW: ";
         mtu = "         UP MTU: "+ to_string(ifn[i].mtu)+"\n";
         inetEnd = "         inet end.: "+ip_src+" Bcast: "+bcast_src+" Masc: "+masc_src+"\n";
-        rxPackets = "         RX packets: ";
+        rxPackets = "         RX packets: ";    
         rxBytes = "         RX bytes: ";
 
         write(client_sock, interface.c_str(), interface.size());
@@ -166,7 +170,32 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
         write(client_sock, inetEnd.c_str(), inetEnd.size());
         write(client_sock, mtu.c_str(), mtu.size());
 
+        write(client_sock, rxPackets.c_str(), rxPackets.size());
+        write(client_sock, rxBytes.c_str(), rxBytes.size());
+
+
     }
+}
+
+void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
+
+
+    struct ifreq ifr;
+    strcpy(ifr.ifr_name, interface.c_str());
+    if(!ioctl(client_socket, SIOCGIFMTU, &ifr)) {
+        ifr.ifr_mtu; // Contains current mtu value
+        cout << "hmm" <<  ifr.ifr_mtu << endl;
+    }
+    ifr.ifr_mtu = mtu; // Change value if it needed
+    if(!ioctl(client_socket, SIOCSIFMTU, &ifr)) {
+        ifr.ifr_mtu;
+    }
+
+    auto msg ="MTU now is "+ std::to_string(ifr.ifr_mtu) + "\n";
+
+    write(client_socket, msg.c_str(), msg.size());
+
+
 }
 
 void TabelaArp::trata_requisicao(struct iface *ifn) {
@@ -258,8 +287,39 @@ void TabelaArp::pao(int client_sock, struct iface *ifn) {
         string result = res(ip);
         write(client_sock, result.c_str(), result.size());
     }
-    else if (request.find("xifconfig") != -1){
+    else if (request.find("xifconfig") != -1) {
         xifconfig_exibe(client_sock, ifn);
+    }
+    else if (request.find("conf_ip_mask") != -1) {
+        int pos = request.find(":");
+        string interface, ip, mask, msg;
+        request = request.substr(pos+1);
+        vector<string> dados = split_to_vector(request, '|');
+        if (dados.size() < 3){
+            msg = "Dados inválidos!\n";
+            write(client_sock, msg.c_str(), msg.size());
+        }
+        else{
+//            add(dados[0], dados[1], atoi(dados[2].c_str()));
+
+            //TODO -----------------------------------------------
+            msg = "---------------------\n";
+            write(client_sock, msg.c_str(), msg.size());
+        }
+
+    } 
+    else if(request.find("mtu") != -1) {
+        int pos = request.find(":");
+        string interface, ip, mask, msg;
+        request = request.substr(pos+1);
+        vector<string> dados = split_to_vector(request, '|');
+        if (dados.size() < 2){
+            msg = "Dados inválidos!\n";
+            write(client_sock, msg.c_str(), msg.size());
+        }
+        else{
+            change_mtu(dados[0], client_sock, stoi(dados[1]));
+        }
     }
 
     close(client_sock);

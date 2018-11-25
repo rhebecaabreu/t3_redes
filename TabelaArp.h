@@ -43,6 +43,7 @@ public:
     string res(string ip);
 
     void xifconfig_exibe(int client_sock, struct iface *ifn); //nome de metodo cagado
+    void change_mtu(string interface, int client_soc, int mtu);
 
 
     mutex mtx_tabela;
