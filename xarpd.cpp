@@ -119,7 +119,6 @@ int bind_iface_name(int fd, char *iface_name)
 /* */
 void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 {
-	//PEGAR ENDEREÇO MAC
 	struct ifreq s{};
 	strcpy(s.ifr_name, ifname);
 
@@ -134,7 +133,8 @@ void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 		char buf[14]{};
 		snprintf(buf, sizeof(buf),"%s\n", inet_ntoa(((struct sockaddr_in *)&s.ifr_addr)->sin_addr));
 		string a = buf;
-		strcpy( (char*) ifn->ip_addr, a.c_str() );
+
+		ifn->ip_addr = a;
 	}
 
     //broadcast value
@@ -157,6 +157,7 @@ void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 //        cout << ifn->masc_addr << endl;
     }
 
+	//mac value
     if (0 == ioctl(sockfd, SIOCGIFHWADDR, &s))
 	{
 		memcpy(ifn->mac_addr, s.ifr_addr.sa_data, ETH_ADDR_LEN);
@@ -186,6 +187,8 @@ void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 	auto* ipaddr = (struct sockaddr_in*)&s2.ifr_addr;
 	ifn->ip_addr = inet_ntoa(ipaddr->sin_addr);
 }
+
+
 // Print the expected command line for the program
 void print_usage()
 {
@@ -335,7 +338,7 @@ int main(int argc, char **argv)
         pool_threads.emplace_back(new thread(read_iface, &my_ifaces[i]));
 	}
 	pool_threads.emplace_back(new thread(verifica_tabela));
-	pool_threads.emplace_back(new thread(&TabelaArp::trata_requisicao, &tabelaArp));
+	pool_threads.emplace_back(new thread(&TabelaArp::trata_requisicao, &tabelaArp, my_ifaces, argc-1 ));
 
 	for (i = 0; i < pool_threads.size(); i++) {
 	    pool_threads[i]->join(); /* Esperar a junção das threads */
