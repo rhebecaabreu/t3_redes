@@ -78,11 +78,12 @@ void connectDaemon()
 
 // Print the expected command line for the program
 void print_usage() {
-    printf("/xarp show - shows ARP table\n");
-    printf("/xarp res <IP adress>\n");
-    printf("/xarp add <IP adress> <ethernet adress> <ttl>\n");
-    printf("/xarp del <IP adress>\n");
-    printf("/xarp <ttl>\n");
+    printf("./xarp show - shows ARP table\n");
+    printf("./xarp res <IP adress>\n");
+    printf("./xarp add <IP adress> <ethernet adress> <ttl>\n");
+    printf("./xarp del <IP adress>\n");
+    printf("./xarp <ttl>\n");
+    printf("./xarp <clear>\n");
 
     exit(1);
 }
