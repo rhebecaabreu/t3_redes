@@ -20,21 +20,21 @@
 using namespace std;
 
 
-struct iface
-{
-    int sockfd;
-    int ttl;
-    int mtu;
-    char ifname[MAX_IFNAME_LEN];
-    unsigned char mac_addr[6];
-    unsigned char ip_addr[14];
-    unsigned char bcast_addr[14];
-    unsigned char masc_addr[14];
-    unsigned int rx_pkts;
-    unsigned int rx_bytes;
-    unsigned int tx_pkts;
-    unsigned int tx_bytes;
-};
+// struct iface
+// {
+//     int sockfd;
+//     int ttl;
+//     int mtu;
+//     char ifname[MAX_IFNAME_LEN];
+//     unsigned char mac_addr[6];
+//     unsigned char ip_addr[14];
+//     unsigned char bcast_addr[14];
+//     unsigned char masc_addr[14];
+//     unsigned int rx_pkts;
+//     unsigned int rx_bytes;
+//     unsigned int tx_pkts;
+//     unsigned int tx_bytes;
+// };
 
 
 vector<string> split_to_vector(string str, char delimiter){
@@ -156,7 +156,7 @@ void TabelaArp::clear(){
     tabela.clear();
 }
 
-void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
+void TabelaArp::xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces) {
 
 //     eth0
 //              Link encap:Ethernet Endereço de HW 00:1e:4f:43:48:06
@@ -174,12 +174,12 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
      string rxPackets;
      string rxBytes;
 
-    for(int i = 0; i < 1; i++){     // TODO arrumar isso aqui, esta lendo apenas para uma interface, se passar mais de uma da bosta
+    for(int i = 0; i < qtd_interfaces; i++){     // TODO arrumar isso aqui, esta lendo apenas para uma interface, se passar mais de uma da bosta
 
         char buf[100]{};
         snprintf(buf, sizeof(buf),"%02X:%02X:%02X:%02X:%02X:%02X \n", ifn[i].mac_addr[0], ifn[i].mac_addr[1], ifn[i].mac_addr[2], ifn[i].mac_addr[3], ifn[i].mac_addr[4], ifn[i].mac_addr[5]);
         mac2 = buf;
-        snprintf(buf, sizeof(buf), "%s", ifn[i].ip_addr);
+        snprintf(buf, sizeof(buf), "%s", ifn[i].ip_addr.c_str());
         string ip_src = buf;
         snprintf(buf, sizeof(buf), "%s", ifn[i].bcast_addr);
         string bcast_src = buf;
@@ -190,8 +190,8 @@ void TabelaArp::xifconfig_exibe(int client_sock, struct iface *ifn) {
         mac = "         Link encap: Ethernet Endereço de HW: ";
         mtu = "         UP MTU: "+ to_string(ifn[i].mtu)+"\n";
         inetEnd = "         inet end.: "+ip_src+" Bcast: "+bcast_src+" Masc: "+masc_src+"\n";
-        rxPackets = "         RX packets: ";    //TODO rx packtes tx packets
-        rxBytes = "         RX bytes: ";        //TODO rx bytes tx bytes
+        rxPackets = "         RX packets: \n";    //TODO rx packtes tx packets
+        rxBytes = "         RX bytes: \n";        //TODO rx bytes tx bytes
 
         write(client_sock, interface.c_str(), interface.size());
         write(client_sock, mac.c_str(), mac.size());
@@ -249,7 +249,7 @@ void TabelaArp::change_mtu(string interface, int client_socket, int mtu) {
 }
 
 
-void TabelaArp::trata_requisicao(struct iface *ifn) {
+void TabelaArp::trata_requisicao(Iface *ifn, int qtd_interfaces) {
     struct sockaddr_in serverIPAddress{};
     serverIPAddress.sin_family = AF_INET;
     serverIPAddress.sin_addr.s_addr = INADDR_ANY;
@@ -274,10 +274,10 @@ void TabelaArp::trata_requisicao(struct iface *ifn) {
         exit(1);
     }
 
-    aguarda_conexao(sockfd);
+    aguarda_conexao(sockfd, ifn, qtd_interfaces);
 }
 
-void TabelaArp::aguarda_conexao(int sockfd) {
+void TabelaArp::aguarda_conexao(int sockfd, Iface *ifn, int qtd_interfaces) {
     int j = 0;
     while(true){
         //Cria struct que vai receber informações do cliente conectado
@@ -290,7 +290,7 @@ void TabelaArp::aguarda_conexao(int sockfd) {
 //         t.join();
 
         //cout << "Cliente " << j++ << " conectado!" << endl;
-        trata_conexao(client_sock, ifn);
+        trata_conexao(client_sock, ifn, qtd_interfaces);
 
         if (client_sock < 0){
             perror("Erro em accept()");
@@ -299,7 +299,7 @@ void TabelaArp::aguarda_conexao(int sockfd) {
     }
 }
 
-void TabelaArp::trata_conexao(int client_sock, struct iface *ifn) {
+void TabelaArp::trata_conexao(int client_sock, Iface *ifn, int qtd_interfaces) {
     char buffer[2048]{};
     string request;
 
@@ -352,7 +352,7 @@ void TabelaArp::trata_conexao(int client_sock, struct iface *ifn) {
         write(client_sock, result.c_str(), result.size());
     }
     else if (request.find("xifconfig") != -1) {
-        xifconfig_exibe(client_sock, ifn);
+        xifconfig_exibe(client_sock, ifn, qtd_interfaces);
     }
     else if (request.find("conf_ip_mask") != -1) {
         int pos = request.find(":");
@@ -364,11 +364,7 @@ void TabelaArp::trata_conexao(int client_sock, struct iface *ifn) {
             write(client_sock, msg.c_str(), msg.size());
         }
         else{
-//            add(dados[0], dados[1], atoi(dados[2].c_str()));
             conf_ip_mask(client_sock, dados[0], dados[1], dados[2]);
-
-            //TODO -----------------------------------------------
-
         }
 
     } 
@@ -460,8 +456,6 @@ bool TabelaArp::req_arp(unsigned char *ip_src, unsigned char *ip_dst, string ifa
         perror ("socket() failed ");
         exit (EXIT_FAILURE);
     }
-
-
 
     /** Bloqueia thread até chegar resposta do arq request ou timeout de 60seg ser atingido **/
     unique_lock<mutex> lck(mtx_req);

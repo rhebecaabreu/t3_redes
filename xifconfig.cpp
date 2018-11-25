@@ -172,7 +172,6 @@ int main(int argc, char **argv)
 		}
 		else if (argc == 3)
 		{
-			cout << "pao" << endl;
 			config_mtu_size(argv[1], argv[2]);
 		}
 		else if (argc == 2)

@@ -17,7 +17,9 @@ public:
     int ttl;
     int mtu;
     char ifname[MAX_IFNAME_LEN];
+    unsigned char bcast_addr[14];
     unsigned char mac_addr[6];
+    unsigned char masc_addr[14];
     string ip_addr;
     unsigned int rx_pkts;
     unsigned int rx_bytes;
