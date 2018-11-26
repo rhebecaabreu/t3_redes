@@ -17,6 +17,10 @@
 #include <string>
 #include <vector>
 #include <ifaddrs.h>
+
+#include <linux/if_link.h>
+#include <ifaddrs.h>
+
 #include "TabelaArp.h"
 #include "Iface.h"
 
@@ -37,22 +41,6 @@ using namespace std;
 
 
 TabelaArp tabelaArp;
-//
-//struct iface
-//{
-//	int sockfd;
-//	int ttl;
-//	int mtu;
-//	char ifname[MAX_IFNAME_LEN];
-//	unsigned char mac_addr[6];
-//	unsigned char ip_addr[14];
-//    unsigned char bcast_addr[14];
-//    unsigned char masc_addr[14];
-//    unsigned int rx_pkts;
-//	unsigned int rx_bytes;
-//	unsigned int tx_pkts;
-//	unsigned int tx_bytes;
-//};
 
 /* */
 struct ether_hdr
@@ -116,6 +104,8 @@ int bind_iface_name(int fd, char *iface_name)
 {
 	return setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface_name, strlen(iface_name));
 }
+
+
 /* */
 void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 {
@@ -186,7 +176,39 @@ void get_iface_info(int sockfd, char *ifname, Iface *ifn)
 
 	auto* ipaddr = (struct sockaddr_in*)&s2.ifr_addr;
 	ifn->ip_addr = inet_ntoa(ipaddr->sin_addr);
-	
+
+
+	//tx rx packets/bytes
+	struct ifaddrs *ifaddr, *ifa;
+	int family, n;
+	char host[NI_MAXHOST];
+
+	if (getifaddrs(&ifaddr) == -1)
+	{
+		perror("getifaddrs");
+		exit(EXIT_FAILURE);
+	}
+
+	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+
+		family = ifa->ifa_addr->sa_family;
+
+		if (strcmp(ifa->ifa_name, ifn->ifname) == 0) {
+
+			if (family == AF_PACKET && ifa->ifa_data != NULL) {
+				struct rtnl_link_stats *stats = (struct rtnl_link_stats *) ifa->ifa_data;
+
+				ifn->rx_bytes = stats->rx_bytes;
+				ifn->tx_bytes = stats->tx_bytes;
+				ifn->tx_pkts = stats->tx_packets;
+				ifn->rx_pkts = stats->rx_packets;
+			}
+		}
+	}
+
+	freeifaddrs(ifaddr);
 
 }
 
@@ -217,6 +239,7 @@ void doProcess(unsigned char *packet, int len)
 		return;
 
 	struct ether_hdr *eth = (struct ether_hdr *)packet;
+
 	arphdr_t *arpheader = NULL; /* Pointer to the ARP header              */
 
 	if (htons(0x0806) == eth->ether_type)
