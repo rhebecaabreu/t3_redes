@@ -189,14 +189,6 @@ void TabelaArp::clear()
 
 void TabelaArp::xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces)
 {
-
-    //     eth0
-    //              Link encap:Ethernet Endereço de HW 00:1e:4f:43:48:06
-    //              inet end.: 200.129.207.50 Bcast:200.129.207.63 Masc:255.255.255.224
-    //              UP MTU:1500
-    //              RX packets:64763539 TX packets:146111148
-    //              RX bytes:9474581484 (8.8 GiB) TX bytes:202753664071 (188.8 GiB)
-
     string interface;
     string inetEnd;
     string mac;
