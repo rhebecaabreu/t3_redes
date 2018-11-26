@@ -230,7 +230,7 @@ void TabelaArp::xifconfig_exibe(int client_sock, Iface *ifn, int qtd_interfaces)
     }
 }
 
-void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, string ip_mask)
+void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, string ip_mask, Iface *ifn)
 {
 
     char buf[100]{};
@@ -242,6 +242,7 @@ void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, strin
     ioctl(client_sock, SIOCSIFADDR, &ifr);
     snprintf(buf, sizeof(buf), "%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
     string ip_src = buf;
+    ifn->ip_addr = ip_src;
     string msg = "IP address is now " + ip_src + "\n";
 
     memset(buf, 0, sizeof(buf));
@@ -250,13 +251,16 @@ void TabelaArp::conf_ip_mask(int client_sock, string interface, string ip, strin
     ioctl(client_sock, SIOCSIFNETMASK, &ifr);
     snprintf(buf, sizeof(buf), "%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_netmask)->sin_addr));
     string netmask = buf;
+
+
+    copy( netmask.begin(), netmask.end(), ifn->masc_addr );
     string msg2 = "IP netmask is now " + netmask + "\n";
 
     write(client_sock, msg.c_str(), msg.size());
     write(client_sock, msg2.c_str(), msg2.size());
 }
 
-void TabelaArp::change_mtu(string interface, int client_socket, int mtu)
+void TabelaArp::change_mtu(string interface, int client_socket, int mtu, Iface *ifn)
 {
 
     struct ifreq ifr;
@@ -270,6 +274,8 @@ void TabelaArp::change_mtu(string interface, int client_socket, int mtu)
     {
         ifr.ifr_mtu;
     }
+
+    ifn->mtu =  ifr.ifr_mtu;
 
     auto msg = "MTU now is " + std::to_string(ifr.ifr_mtu) + "\n";
 
@@ -413,7 +419,7 @@ void TabelaArp::trata_conexao(int client_sock, Iface *ifn, int qtd_interfaces)
         }
         else
         {
-            conf_ip_mask(client_sock, dados[0], dados[1], dados[2]);
+            conf_ip_mask(client_sock, dados[0], dados[1], dados[2], ifn);
         }
     }
     else if (request.find("mtu") != -1)
@@ -429,7 +435,7 @@ void TabelaArp::trata_conexao(int client_sock, Iface *ifn, int qtd_interfaces)
         }
         else
         {
-            change_mtu(dados[0], client_sock, stoi(dados[1]));
+            change_mtu(dados[0], client_sock, stoi(dados[1]), ifn);
         }
     }
     else if (request.find("clear") != 1)
